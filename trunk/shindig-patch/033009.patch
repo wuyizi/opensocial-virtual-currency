@@ -188,6 +188,14 @@ Index: features/src/main/javascript/features/opensocial-payment/feature.xml
 +    <script src="paymentprocessor.js"/>
 +  </container>
 +</feature>
+
+Property changes on: features\src\main\javascript\features\opensocial-payment\feature.xml
+___________________________________________________________________
+Added: svn:mime-type
+   + text/xml
+Added: svn:eol-style
+   + native
+
 Index: features/src/main/javascript/features/opensocial-payment/paymentprocessor.js
 ===================================================================
 --- features/src/main/javascript/features/opensocial-payment/paymentprocessor.js	(revision 0)
@@ -442,6 +450,12 @@ Index: features/src/main/javascript/features/opensocial-payment/paymentprocessor
 +  };
 +
 +})();
+
+Property changes on: features\src\main\javascript\features\opensocial-payment\paymentprocessor.js
+___________________________________________________________________
+Added: svn:eol-style
+   + native
+
 Index: features/src/main/javascript/features/opensocial-reference/container.js
 ===================================================================
 --- features/src/main/javascript/features/opensocial-reference/container.js	(revision 759860)
@@ -1357,13 +1371,157 @@ Added: svn:mime-type
 
 Index: javascript/container/sample-payment.xml
 ===================================================================
-Cannot display: file marked as a binary type.
-svn:mime-type = application/xml
+--- javascript/container/sample-payment.xml	(revision 0)
++++ javascript/container/sample-payment.xml	(revision 0)
+@@ -0,0 +1,143 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<Module>
++  <ModulePrefs title="My App Test"
++               author_email="yizi.wu@gmail.com" scrolling="true">
++    <Require feature="opensocial-0.8"/>
++    <Require feature="dynamic-height"/>
++    <Require feature="settitle"/>
++    <Require feature="views"/>
++    <Require feature="rpc"/>
++  </ModulePrefs>
++  <Content type="html" view="default">
++    <![CDATA[
++      <style>
++        #main {
++          font-size:13px;
++        }
++        .t {
++          width:300px;
++        }
++        .f {
++          border-collapse:collapse;
++          margin-left:10px;
++        }
++        .f tbody tr td {
++          font-size:12px;
++          font-weight:bold;
++          white-space:nowrap;
++          vertical-align:top;
++        }
++        .f tbody tr td span {
++          font-size:10px;
++          white-space:normal;
++        }
++        .desc {
++          color:#007F7F;
++        }
++        </style>
++      <script>
++
++        function requestPayment() {
++          var paymentHandlerUrl = document.getElementById('backend').value;
++          var params = {};
++          params[opensocial.Payment.Field.AMOUNT] = document.getElementById('amount').value;
++          params[opensocial.Payment.Field.MESSAGE] = document.getElementById('message').value;
++          params[opensocial.Payment.Field.PARAMETERS] = gadgets.util.escapeString(document.getElementById('parameters').value);
++          params[opensocial.Payment.Field.PAYMENT_TYPE] = document.getElementById('creditType').checked ? 
++              opensocial.Payment.PaymentType.CREDIT : opensocial.Payment.PaymentType.PAYMENT;
++          
++          if (window.console) {
++            window.console.log(params);
++          }
++          
++          var payment = opensocial.newPayment(params);
++
++          opensocial.requestPayment(paymentHandlerUrl, payment, function(responseItem) {
++            document.getElementById('res').style.display = 'block';
++
++            document.getElementById('status').innerHTML = responseItem.hadError() ? 'FAILED' : 'SUCCESS';
++            
++            var data = responseItem.getData();
++            document.getElementById('type').innerHTML = data.getField(opensocial.Payment.Field.PAYMENT_TYPE);
++            document.getElementById('orderid').innerHTML = data.getField(opensocial.Payment.Field.ORDER_ID);
++            document.getElementById('code').innerHTML = data.getField(opensocial.Payment.Field.RESPONSE_CODE);
++            document.getElementById('resmsg').innerHTML = data.getField(opensocial.Payment.Field.RESPONSE_MESSAGE);
++            document.getElementById('orderedtime').innerHTML = new Date(data.getField(opensocial.Payment.Field.ORDERED_TIME));
++            document.getElementById('submittedtime').innerHTML = new Date(data.getField(opensocial.Payment.Field.SUBMITTED_TIME));
++            document.getElementById('executedtime').innerHTML = new Date(data.getField(opensocial.Payment.Field.EXECUTED_TIME));
++
++            gadgets.window.adjustHeight();
++          });
++          document.getElementById('res').style.display = 'none';
++
++        };
++
++        function changeTitle() {
++          var title = document.getElementById('title').value;
++          gadgets.window.setTitle(title);
++        };
++
++        function init() {
++          document.getElementById('view').innerHTML = 'Current View: <b>' + gadgets.views.getCurrentView().getName() + '</b>';
++          var req = opensocial.newDataRequest();
++          req.add(req.newFetchPersonRequest(opensocial.IdSpec.PersonId.VIEWER), "req");
++          req.send(function(data) {
++            if (!data.hadError()) {
++              document.getElementById('myname').innerHTML = 'Current Viewer: <b>' + data.get("req").getData().getDisplayName() + '</b>';
++            }
++            gadgets.window.adjustHeight();
++          });
++        };
++        gadgets.util.registerOnLoadHandler(init);
++      </script>
++
++
++      <div id="main">
++        <p class="desc">
++            Here is the app domain inside the gadget iframe, usually different from container domain:<br>
++            <b><script>document.write('http://' + window.location.host + window.location.pathname + location.search.substring(0, 30) + '...');</script></b>
++        </p>
++        <p>
++          <span id="myname"></span>
++          &nbsp;&nbsp;&nbsp;&nbsp;
++          <span id="view"></span>
++        </p>
++        <!--<p>
++          <input class=t id=title value="New Title">
++          <button onclick="changeTitle();">Change Title</button>
++        </p>-->
++        <hr>
++        <div id=req>
++          <b>Make a Payment Request: </b><br>
++          <table class=f><tbody>
++          <tr><td>Amount: </td><td><input class=t id=amount value=100></td></tr>
++          <tr><td>Message: </td><td><input class=t id=message value="You are ordering some flowers."></td></tr>
++          <tr><td>Parameters: </td><td><input class=t id=parameters value="{type:'Tulip',quantity:5}"></td></tr>
++          <tr><td>Payment Handler Url: </td><td><input class=t id=backend value="http://www.unickway.org.cn/vcdemo/mode-3/app-backend.php"></td></tr>
++          <tr><td>Payment Type: </td><td>
++              <input type=radio id=paymentType name=pt checked><label for=paymentType>Payment</label>
++              <input type=radio id=creditType name=pt><label for=creditType>Credit</label>
++          </td></tr>
++          </tbody></table>
++          <button onclick="requestPayment();">Request Payment</button>
++        </div>
++
++        <div id=res style="display:none">
++          <hr>
++          <b>Payment Response: </b><br>
++          <table class=f><tbody>
++          <tr><td>Payment Type: </td><td><span id=type></span></td></tr>
++          <tr><td>Status: </td><td><span id=status></span></td></tr>
++          <tr><td>Order ID: </td><td><span id=orderid></span></td></tr>
++          <tr><td>Response Code: </td><td><span id=code></span></td></tr>
++          <tr><td>Response Message: </td><td><span id=resmsg></span></td></tr>
++          <tr><td>Ordered Time: </td><td><span id=orderedtime></span></td></tr>
++          <tr><td>Submitted Time: </td><td><span id=submittedtime></span></td></tr>
++          <tr><td>Executed Time: </td><td><span id=executedtime></span></td></tr>
++          </tbody></table>
++        </div>
++      </div>
++     ]]>
++  </Content>
++</Module>
++
 
 Property changes on: javascript\container\sample-payment.xml
 ___________________________________________________________________
 Added: svn:mime-type
-   + application/xml
+   + text/xml
 
 Index: run.bat
 ===================================================================
