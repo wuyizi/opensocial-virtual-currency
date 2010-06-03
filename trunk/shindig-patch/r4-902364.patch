@@ -2117,7 +2117,7 @@ Index: javascript/container/sample-payment-container.html
 +    <h2>OpenSocial Virtual Currency Proposal Revision #4 Demo</h2>
 +
 +    <h4>opensocial.requestPayment<br>opensocial.requestPaymentRecords</h4>
-+    <div>For detail, please checkout <a href="http://docs.google.com/Doc?id=dfjcf7w4_10ddst9xd9" target=_blank>proposal doc</a>, 
++    <div>For detail, please checkout <a href="http://docs.google.com/View?id=dhcrsqrj_0d86fkdfv" target=_blank>proposal doc</a>, 
 +      <a href="http://groups.google.com/group/opensocial-and-gadgets-spec/browse_thread/thread/7341f1716e50f4d/8553e6aa696bd088?lnk=gst" target=_blank>discussion thread</a>, and 
 +      <a href="http://code.google.com/p/opensocial-virtual-currency" target=_blank>code project</a>.
 +    </div>
