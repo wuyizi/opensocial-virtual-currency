@@ -1,0 +1,2353 @@
+Index: content/container/payment-processor.html
+===================================================================
+--- content/container/payment-processor.html	(revision 0)
++++ content/container/payment-processor.html	(revision 0)
+@@ -0,0 +1,299 @@
++<!DOCTYPE html>
++<html>
++<head>
++<title>Sample: Payment Processor</title>
++
++<style>
++body, td, div, span, p {
++  font-family:arial,sans-serif;
++}
++body {
++  padding:0px;
++  margin:0px;
++}
++.payment-processor-shadow {
++  filter: alpha(opacity=30);
++  -moz-opacity:.3;
++  opacity:0.3;
++  background-color:#000;
++  width:690px;
++  height:390px;
++  margin:5px 0px 0px 5px;
++  position:absolute;
++  z-index:100;
++}
++.payment-processor-border1 {
++  background-color:#E5ECF9;
++  width:690px;
++  height:390px;
++  position:absolute;
++  z-index:200;
++}
++.payment-processor-border2 {
++  background-color:#FFF;
++  margin:5px;
++  height:380px;
++}
++.payment-processor-content {
++  padding:20px;
++  font-size:13px;
++}
++.payment-processor-content #loading-tab {
++  color:#777;
++}
++.caption {
++  font-weight:bold;
++  width:80px;
++  display:inline;
++}
++.desc {
++  color:#007F00;
++}
++.head {
++  font-weight:bold;
++}
++</style>
++
++
++<script type="text/javascript">
++
++/**
++ * @static
++ * @class A sample payment process panel provides the UI and logic for the real payment excution on
++ *        container api server. 
++ *
++ *        NOTE:
++ *
++ *          All functions or logics or names in this page are customizable. Indeed containers have
++ *          to customize them to make the UI consistent. This sample panel page is embeded in the 
++ *          parent container page as an iframe for better code structure, but indeed it is not 
++ *          necessary. It can be on the same page as container page.
++ *
++ *          You can implement their processor panel page using this file but replace the UI and 
++ *          mock codes, or use your completely own codes.  If you use your own page, just to make 
++ *          sure <code>shindig.paymentprocessor.initPayment</code> function is called with necessary
++ *          callbacks (open and close event handlers) passed in when initializing the page.
++ *
++ */
++var myProcessorPanel = (function() {
++
++  /** Element which holding this processor panel page in parent window. */
++  var parentDiv;
++
++  /** Just a reference to <code>shindig.paymentprocessor</code> object, which holding necessary 
++      parameters needed in the payment process */
++  var processor;
++
++  /**
++   * Called by <code>shindig.paymentprocessor</code> when the counter 
++   * panel is closing.
++   */
++  function closeEvent() {
++    // Set the div in the parent window to invisible.
++    parentDiv.style.display = 'none';
++  };
++
++
++  /**
++   * Draws the pay counter panel UI itself.
++   * (NOTE that this page is a iframe in its parent container window);
++   * Assigns the submit callback and cancel callback to the buttons.
++   * So from this panel, submit or cancel actions can be made.
++   *
++   * @param {Object} paymentJson The payment parameters.
++   * @param {Object} extraParams The extra parameters for the payment 
++   *                 procedure, including handler url, app title and spec.
++   * @param {Function} submitCallback The submit callback in 
++   *                   <code>shindig.paymentprocessor</code>.
++   * @param {Function} cancelCallback The cancel callback in 
++   *                   <code>shindig.paymentprocessor</code>.
++   */
++  function openEvent() {
++    // Set the UI.
++    document.getElementById('loading-tab').style.display = 'none';
++
++    document.getElementById('payment-appname').innerHTML = processor.getParam('appTitle');
++    document.getElementById('payment-appspec').innerHTML = processor.getParam('appSpec');
++    
++    document.getElementById('payment-type').innerHTML = processor.getParam('payment.paymentType');
++    document.getElementById('payment-amount').innerHTML = processor.getParam('payment.amount');
++    document.getElementById('payment-message').innerHTML = processor.getParam('payment.message');
++
++    var items = processor.getParam('payment.items');
++    if (items) {
++      var html = '<table border=1><tbody><tr class=head><td>SKU_ID</td><td>Price</td>' +
++                 '<td>Count</td><td>Description</td></tr>';
++      for (var i = 0; i < items.length; i++) {
++        html += '<tr>' + 
++            '<td>' + items[i]['skuId'] + '</td>' + 
++            '<td>' + items[i]['price'] + '</td>' + 
++            '<td>' + items[i]['count'] + '</td>' + 
++            '<td>' + items[i]['description'] + '</td>' + 
++            '</tr>';
++      }
++      html += '</tbody></table>';
++      document.getElementById('payment-items').innerHTML = html;
++    } else {
++      document.getElementById('payment-items').innerHTML = 'No detail items';
++    }
++
++    document.getElementById('payment-orderedtime').innerHTML = 
++        new Date(processor.getParam('payment.orderedTime')).toLocaleString();
++
++    if (processor.getParam('payment.paymentType') == 'credit') {
++      // If the payment type is 'credit', skip the confirm panel UI and 
++      // call the submitEvent directly.
++      window.setTimeout(submitHandler, 500);
++    } else {
++      // If the payment type is normal 'payment', add click listeners and 
++      // wait for user confirmation.
++      document.getElementById('button-tab').style.display = 'block';
++      document.getElementById('payment-submit').onclick = submitHandler;
++      document.getElementById('payment-cancel').onclick = cancelHandler;
++    }
++
++    // Set the div in the parent window to visible.
++    parentDiv.style.display = 'block';
++  };
++
++  /**
++   * Called by submit button clicked by the user.
++   *
++   * This function should send the pay request to container virtual currency
++   * api with Ajax POST.
++   *
++   * Then usually an acknowledge tab will be shown in the  with a button to
++   * call the callback function.
++   */
++  function submitHandler() {
++    document.getElementById('button-tab').style.display = 'none';
++    document.getElementById('loading-tab').style.display = 'block';
++
++
++    var requestData = processor.getParam('payment');
++    requestData['st'] = processor.getParam('stoken'); // or other security token
++
++
++
++
++    //////////////////////////////////////////////////////////////////////////////////////
++    // Here the logic should be on container sever with communication with app server.  //
++    // See the proposal doc Rivision#4.                                                 //
++    //////////////////////////////////////////////////////////////////////////////////////
++    var sendPaymentRequest = function(ajaxCallback) {
++      // The Server will communicate with App Backend Server then response.
++      // Here is just a fake call. You should replace these codes with actual ajax.
++      // Wait 1 second to simulate the network connection.
++      window.setTimeout(function() {
++        var responseData = {};
++        responseData['submittedTime'] = new Date().getTime();
++
++
++        // Do some fake check here. Can be any type of error during server-to-server roundtrips.
++        if (requestData['amount'] > 1000) {
++          responseData['responseCode'] = 'INSUFFICIENT_MONEY';
++          responseData['responseMessage'] = 'Fake not enough money response!';
++          ajaxCallback(responseData);
++          return;
++        }
++
++        // Simulate success response.
++        responseData['orderId'] = 'ORDER_ID_FROM_APP_' + Math.round(Math.random() * 10000);
++        responseData['executedTime'] = new Date().getTime();
++        responseData['responseCode'] = 'OK';
++        responseData['responseMessage'] = 'Fake success response!';
++        ajaxCallback(responseData);
++
++      }, 1000);
++    };
++    //////////////////////////////////////////////////////////////////////////////////////
++
++
++
++
++    // Send Ajax Call to Container Virtual Currency API Server.
++    sendPaymentRequest(function(responseData) {
++
++      processor.setParam('payment.responseCode', responseData['responseCode']);
++      processor.setParam('payment.responseMessage', responseData['responseMessage']);
++
++      if (responseData['responseCode'] == 'OK') {
++        // Copy the server generated fields back to processor parameters.
++        processor.setParam('payment.submittedTime', responseData['submittedTime']);
++        processor.setParam('payment.executedTime', responseData['executedTime']);
++        processor.setParam('payment.orderId', responseData['orderId']);
++      }
++
++      // Close the processor panel and return to app.
++      processor.closePayment();
++    });  
++  };
++
++
++  /**
++   * Invoked when cancel button clicked by user.
++   */
++  function cancelHandler() {
++    // You can also show a message to say the order is canceled.
++    // Here just call the callback and return.
++    processor.setParam('payment.responseCode', 'USER_CANCELLED');
++    processor.closePayment();
++  };
++
++
++
++  return {
++    /**
++     * Initializes the counter module. It can be called by this page's <code>body.onload()</code> 
++     * function or in other initializing steps.
++     * Note the <code>shindig.paymentprocessor</code> object is passed from the parent window.
++     */
++    init: function() {
++      // Store the parent node in which there is an iframe holding this page.
++      parentDiv = window.frameElement.parentNode;
++
++      processor = parent.shindig.paymentprocessor;
++
++      // Initialize the paymentprocessor module with four events.
++      // The container need to fully implement these event functions for
++      // UI/Backend interaction.
++      processor.initPayment(openEvent, closeEvent);
++    }
++  };
++
++})();
++
++</script>
++</head>
++<body onload="myProcessorPanel.init();">
++  <!-- Customize the UI -->
++  <div class="payment-processor-shadow"></div>
++  <div class="payment-processor-border1">
++    <div class="payment-processor-border2">
++      <div class="payment-processor-content">
++        <p class="desc">
++          This panel is in an iframe from another page in the same container domain:<br>
++          <b><script>document.write(window.location.href);</script></b>
++        </p>
++        <div class="caption">App Name: </div><span id="payment-appname"></span><br>
++        <div class="caption">App Spec: </div><span id="payment-appspec"></span><br>
++        <br>
++        <div class="caption">Payment Type: </div><span id="payment-type"></span><br>
++        <div class="caption">Amount: </div><span id="payment-amount"></span><br>
++        <div class="caption">Message: </div><span id="payment-message"></span><br>
++        <div class="caption">Items: </div><br><div id="payment-items"></div>
++        <div class="caption">Ordered Time: </div><span id="payment-orderedtime"></span><br>
++        <br>
++        <div id="button-tab" style="display:none;">
++          <button id="payment-submit">Submit</button>
++          <button id="payment-cancel">Cancel</button>
++        </div>
++        <div id="loading-tab" style="display:none">
++          Please wait...
++        </div>
++      </div>
++    </div>
++  </div>
++</body>
++</html>
++
+
+Property changes on: content\container\payment-processor.html
+___________________________________________________________________
+Added: svn:mime-type
+   + text/html
+Added: svn:eol-style
+   + native
+
+Index: content/container/payment-records-processor.html
+===================================================================
+--- content/container/payment-records-processor.html	(revision 0)
++++ content/container/payment-records-processor.html	(revision 0)
+@@ -0,0 +1,388 @@
++<!DOCTYPE html>
++<html>
++<head>
++<title>Sample: Payment Records Processor</title>
++
++<style>
++body, td, div, span, p {
++  font-family:arial,sans-serif;
++}
++body {
++  padding:0px;
++  margin:0px;
++}
++.payment-processor-shadow {
++  filter: alpha(opacity=30);
++  -moz-opacity:.3;
++  opacity:0.3;
++  background-color:#000;
++  width:690px;
++  height:390px;
++  margin:5px 0px 0px 5px;
++  position:absolute;
++  z-index:100;
++}
++.payment-processor-border1 {
++  background-color:#E5ECF9;
++  width:690px;
++  height:390px;
++  position:absolute;
++  z-index:200;
++}
++.payment-processor-border2 {
++  background-color:#FFF;
++  margin:5px;
++  height:380px;
++}
++.payment-processor-content {
++  padding:20px;
++  font-size:13px;
++}
++.payment-processor-content #loading-tab {
++  color:#777;
++}
++.caption {
++  font-weight:bold;
++  width:80px;
++  display:inline;
++}
++.desc {
++  color:#007F00;
++}
++.head {
++  font-weight:bold;
++}
++</style>
++
++
++<script type="text/javascript">
++
++/**
++ * @static
++ * @class A sample records processor panel provides the UI and logic for the real records fetching
++ *        and fixing requests to container api server. 
++ *
++ *        NOTE:
++ *
++ *          All functions or logics or names in this page are customizable. Indeed containers have
++ *          to customize them to make the UI consistent. This sample panel page is embeded in the 
++ *          parent container page as an iframe for better code structure, but indeed it is not 
++ *          necessary. It can be on the same page as container page.
++ *
++ *          You can implement their processor panel page using this file but replace the UI and 
++ *          mock codes, or use your completely own codes.  If you use your own page, just to make 
++ *          sure <code>shindig.paymentprocessor.initPaymentRecords</code> function is called with 
++ *          necessary callbacks (open and close event handlers) passed in when initializing the 
++ *          page.
++ *
++ */
++var myRecordsProcessorPanel = (function() {
++
++  /** Element which holding this processor panel page in parent window. */
++  var parentDiv;
++
++  /** Just a reference to <code>shindig.paymentprocessor</code> object, which holding necessary 
++      parameters needed in the payment process */
++  var processor;
++
++  /**
++   * Called by <code>shindig.paymentprocessor</code> when the counter 
++   * panel is closing.
++   */
++  function closeEvent() {
++    // Set the div in the parent window to invisible.
++    parentDiv.style.display = 'none';
++  };
++
++
++  /**
++   * Draws the pay counter panel UI itself.
++   * (NOTE that this page is a iframe in its parent container window);
++   * Assigns the submit callback and cancel callback to the buttons.
++   * So from this panel, submit or cancel actions can be made.
++   *
++   * @param {Object} paymentJson The payment parameters.
++   * @param {Object} extraParams The extra parameters for the payment 
++   *                 procedure, including handler url, app title and spec.
++   * @param {Function} submitCallback The submit callback in 
++   *                   <code>shindig.paymentprocessor</code>.
++   * @param {Function} cancelCallback The cancel callback in 
++   *                   <code>shindig.paymentprocessor</code>.
++   */
++  function openEvent() {
++    // Set the div in the parent window to visible.
++    parentDiv.style.display = 'block';
++    document.getElementById('payment-appname').innerHTML = processor.getParam('appTitle');
++    document.getElementById('payment-appspec').innerHTML = processor.getParam('appSpec');
++
++    document.getElementById('payment-records-close').onclick = cancelHandler;
++
++    // The requestData is going to post to server.
++    var requestData = {
++      'appSpec' : processor.getParam('appSpec'),
++      'appTitle' : processor.getParam('appTitle'),
++      'st' : processor.getParam('stoken'),       // or other security token if needed
++
++      'params' : processor.getParam('reqParams'),
++      'sandbox': processor.getParam('reqParams.sandbox')
++    };
++
++    //////////////////////////////////////////////////////////////////////////////////////
++    // Here the logic should be on container sever for fetching payment records.        //
++    // See the proposal doc Rivision#4.                                                 //
++    //////////////////////////////////////////////////////////////////////////////////////
++    var sendFetchPaymentRecordsRequest = function(ajaxCallback) {
++      // The Server will fetch data from it's own database then response.
++      // Here is just a fake call. You should replace these codes with actual ajax.
++      // Wait 1 second to simulate the network connection.
++      window.setTimeout(function() {
++        // Get the payment records in database by querying with appSpec. Here uses mock data.
++        var mockData = [
++          {
++            'orderId' : 'ORDER_ID_FROM_APP_' + Math.round(Math.random() * 10000),
++            'items': [
++              {'skuId':'1234', 'price':'10', 'count': 5, 'description':'this is fake.'},
++              {'skuId':'2345', 'price':'11', 'count': 7, 'description':'this is fake2.'}
++            ],
++            'amount': 127,
++            'message': 'Fake message',
++            'paymentType': 'payment',
++            'orderedTime': new Date().getTime(),
++            'submittedTime': new Date().getTime(),
++            'executedTime': new Date().getTime(),
++            'responseCode': 'OK',
++            'responseMessage': 'Payment done.',
++            'paymentComplete': true,
++            'sandbox': !!requestData['sandbox']
++          }, {
++            'orderId' : 'ORDER_ID_FROM_APP_' + Math.round(Math.random() * 10000),
++            'items': [
++              {'skuId':'3456', 'price':'5', 'count': 30, 'description':'this is fake3.'},
++              {'skuId':'6789', 'price':'100', 'count': 1, 'description':'this is fake4.'}
++            ],
++            'amount': 250,
++            'message': 'Fake message2',
++            'paymentType': 'payment',
++            'orderedTime': new Date().getTime(),
++            'submittedTime': new Date().getTime(),
++            'executedTime': new Date().getTime(),
++            'responseCode': 'APP_LOGIC_ERROR',
++            'responseMessage': 'Payment failed on app.',
++            'paymentComplete': false,
++            'sandbox': !!requestData['sandbox']
++          }, {
++            'orderId' : 'ORDER_ID_FROM_APP_' + Math.round(Math.random() * 10000),
++            'items': [
++              {'skuId':'abcd', 'price':'3', 'count': 3, 'description':'this is fake5.'},
++              {'skuId':'efgh', 'price':'12', 'count': 4, 'description':'this is fake6.'}
++            ],
++            'amount': 57,
++            'message': 'Fake message3',
++            'paymentType': 'payment',
++            'orderedTime': new Date().getTime(),
++            'submittedTime': new Date().getTime(),
++            'executedTime': new Date().getTime(),
++            'responseCode': 'PAYMENT_ERROR',
++            'responseMessage': 'Payment failed on container.',
++            'paymentComplete': false,
++            'sandbox': !!requestData['sandbox']
++          }
++        ];
++
++        var max = Number(requestData['params']['max']);
++        if (!max) {
++          max = 3 // If not set or incorrectly set, set default value.
++        }
++
++        ajaxCallback(mockData.slice(0, max));
++      }, 1000);
++    };
++    ////////////////////////////////////////////////////////////////////////////////////
++
++
++
++
++
++    // Send ajax request
++    document.getElementById('loading-tab').style.display = 'block';
++
++    sendFetchPaymentRecordsRequest(function(responseData) {
++      document.getElementById('loading-tab').style.display = 'none';
++
++      var records = processor.getParam('records.payments');
++
++      var incompleteIds = [];
++
++      // Generate the payment records table UI
++      var html = '<table border=1><tbody><tr class="head">' +
++          '<td>Amount</td><td>Message</td><td>SubmittedTime</td>' + 
++          '<td>ResponseCode</td><td>ExecutedTime</td>'+ 
++          '</tr>';
++      for (var i = 0; i < responseData.length; i++) {
++        var paymentJson = responseData[i];
++        var orderId = paymentJson['orderId'];
++        html += '<tr><td>' + paymentJson['amount'] + '</td>' +
++            '<td>' + paymentJson['message'] + '</td>' +
++            '<td>' + new Date(paymentJson['submittedTime']).toLocaleString() + '</td>' +
++            '<td>' + paymentJson['responseCode'] + '</td>' +
++            '<td id=\'td_' + orderId + '\'>';
++        if (!paymentJson['paymentComplete']) {
++          // Show a 'FixIt' button for non-complete payment with ID equals orderId.
++          html += '<button id=\'' + orderId + '\'>FixIt</button>';
++          // Add the incompletes to records.
++          records[orderId] = paymentJson;
++          incompleteIds.push(orderId);
++        } else {
++          html += new Date(paymentJson['executedTime']).toLocaleString();
++        }
++        html += '</td></tr>';
++      }
++      html += '</tbody></table>';
++      document.getElementById('payment-records').innerHTML = html;
++
++      // Assign onclick handler's for incomplete payments.
++      for (var j = 0; j < incompleteIds.length; j++) {
++        document.getElementById(incompleteIds[j]).onclick = submitHandler;
++      }
++    });
++    
++  };
++
++  /**
++   * Called by submit button clicked by the user.
++   *
++   * This function should send the payment fixing request to container virtual currency
++   * api with Ajax POST.
++   */
++  function submitHandler() {
++    var orderId = this.id;
++    var requestData = {
++      'appSpec' : processor.getParam('appSpec'),
++      'appTitle' : processor.getParam('appTitle'),
++      'st' : processor.getParam('stoken'),       // or other security token
++
++      'orderId' : orderId,
++      'sandbox': processor.getParam('reqParams.sandbox')
++    };
++
++    //////////////////////////////////////////////////////////////////////////////////////
++    // Here the logic should be on container sever for updating an incomplete payment.  //
++    // See the proposal doc Rivision#4.                                                 //
++    //////////////////////////////////////////////////////////////////////////////////////
++    var sendFixPaymentRecordRequest = function(ajaxCallback) {
++      // The Server will communicate with App Backend Server then response.
++      // Here is just a fake call.
++      // Wait 1 second to simulate the network connection.
++      window.setTimeout(function() {
++        // let say it will always succeed.
++        var responseData = {};
++
++        // Simulate success response.
++        responseData['paymentComplete'] = true;
++        responseData['executedTime'] = new Date().getTime();
++        responseData['responseCode'] = 'OK';
++        if (!!requestData['sandbox']) {
++          responseData['responseMessage'] = 'Fake success response in sandbox!';
++        } else {
++          responseData['responseMessage'] = 'Fake success response!';
++        }
++        
++        ajaxCallback(responseData);
++      }, 1000);
++    };
++    ///////////////////////////////////////////////////////////////////////////////////// 
++
++
++
++
++
++    // Send ajax request
++    document.getElementById('loading-tab').style.display = 'block';
++
++    sendFixPaymentRecordRequest(function(responseData) {
++      document.getElementById('loading-tab').style.display = 'none';
++
++      if (responseData['responseCode'] != 'OK') {
++        // something fail, display exception message and let user try again.
++        document.getElementById(orderId).innerHTML = 'Try again';
++        return;
++      }
++
++      // If fixing request succeeded, replay the button with payment executed time.
++      document.getElementById('td_' + orderId).innerHTML = 
++          new Date(responseData['executedTime']).toLocaleString();
++
++      // Updates the payment json object in the records.
++      var paymentJson = processor.getParam('records.payments.' + orderId);
++      paymentJson['paymentComplete'] = true;
++      paymentJson['executedTime'] = responseData['executedTime'];
++      paymentJson['responseCode'] = responseData['responseCode'];
++      paymentJson['responseMessage'] = responseData['responseMessage'];
++
++    });
++
++  };
++
++  /**
++   * Invoked when cancel button clicked by user. Closes the processor.
++   */
++  function cancelHandler() {
++    // You can also show a message to say the order is canceled.
++    // Here just call the callback and return.
++
++    processor.setParam('records.responseCode', 'OK');
++
++    processor.closePaymentRecords();
++  };
++
++  return {
++  
++    /**
++     * Initializes the counter module. It can be called by this page's <code>body.onload()</code> 
++     * function or in other initializing steps.
++     * Note the <code>shindig.paymentprocessor</code> object is passed from the parent window.
++     */
++    init: function() {
++      // Store the parent node in which there is an iframe holding this page.
++      parentDiv = window.frameElement.parentNode;
++
++      processor = parent.shindig.paymentprocessor;
++
++      // Initialize the paymentprocessor module with four events.
++      // The container need to fully implement these event functions for
++      // UI/Backend interaction.
++      processor.initPaymentRecords(openEvent, closeEvent);
++    }
++
++  };
++})();
++
++</script>
++</head>
++<body onload="myRecordsProcessorPanel.init();">
++  <!-- Customize the UI -->
++  <div class="payment-processor-shadow"></div>
++  <div class="payment-processor-border1">
++    <div class="payment-processor-border2">
++      <div class="payment-processor-content">
++        <p class="desc">
++          This panel is in an iframe from another page in the same container domain:<br>
++          <b><script>document.write(window.location.href);</script></b>
++        </p>
++
++        <div class="caption">App Name: </div><span id="payment-appname"></span><br>
++        <div class="caption">App Spec: </div><span id="payment-appspec"></span><br>
++
++        <p id="payment-records"></p>
++
++        <div id="button-tab">
++          <button id="payment-records-close">Close</button>
++        </div>
++
++        <div id="loading-tab" style="display:none">Please wait...</div>
++      </div>
++    </div>
++  </div>
++</body>
++</html>
++
+
+Property changes on: content\container\payment-records-processor.html
+___________________________________________________________________
+Added: svn:mime-type
+   + text/html
+Added: svn:eol-style
+   + native
+
+Index: content/container/sample-payment-container.html
+===================================================================
+--- content/container/sample-payment-container.html	(revision 0)
++++ content/container/sample-payment-container.html	(revision 0)
+@@ -0,0 +1,110 @@
++<!DOCTYPE html>
++<html>
++<head>
++<title>Sample: Virtual Currency Payment</title>
++<!-- default container look and feel -->
++<link rel="stylesheet" href="gadgets.css">
++<style>
++  .gadgets-gadget-chrome {
++    width: 80%;
++    float: none;
++    margin: auto;
++  }
++  .gadgets-gadget {
++    width: 100%;
++  }
++  .desc {
++    color:#007F00;
++  }
++  .desc script {
++    color:#FF0000;
++  }
++</style>
++
++<script type="text/javascript" src="/gadgets/js/shindig-container:rpc:opensocial-payment.js?c=1&debug=1"></script>
++<script type="text/javascript">
++
++function output(message) {
++  document.getElementById("output").innerHTML += gadgets.util.escapeString(message) + "<br/>";
++};
++
++// The container domain.
++var containerHost = 'http://' + window.location.host;
++
++// NOTE: Set the gadget serverBase here to replace 'window.location.host' which is just for demo.
++// The shindig domain must be different from the container domain for security reason.
++var shindigHost = 'http://' + window.location.host;
++
++// The location of the demo app spec. It is located on container domain.
++var demoGadgetSpecs = [
++   containerHost + '/container/sample-payment.xml',
++];
++
++function renderGadgets() {
++  var demoGadgets = [];
++  var chromeIds = [];
++  for (var i = 0; i < demoGadgetSpecs.length; ++i) {
++    var gadget = shindig.container.createGadget({
++        specUrl: demoGadgetSpecs[i],
++        title: ("Sample Payment App - " + i)
++    });
++    gadget.setServerBase(shindigHost + '/gadgets/');
++    shindig.container.addGadget(gadget);
++    chromeIds.push('gadget-chrome-' + i);
++    demoGadgets.push(gadget);
++  }
++  shindig.container.layoutManager.setGadgetChromeIds(chromeIds);
++  for (var i = 0; i < demoGadgets.length; ++i) {
++    shindig.container.renderGadget(demoGadgets[i]);
++  }
++};
++
++
++</script>
++</head>
++<body onLoad="renderGadgets();">
++  <center>
++    <h2>OpenSocial Virtual Currency Proposal Revision #4 Demo</h2>
++
++    <h4>opensocial.requestPayment<br>opensocial.requestPaymentRecords</h4>
++    <div>For detail, please checkout <a href="http://docs.google.com/View?id=dhcrsqrj_0d86fkdfv" target=_blank>proposal doc</a>, 
++      <a href="http://groups.google.com/group/opensocial-and-gadgets-spec/browse_thread/thread/7341f1716e50f4d/8553e6aa696bd088?lnk=gst" target=_blank>discussion thread</a>, and 
++      <a href="http://code.google.com/p/opensocial-virtual-currency" target=_blank>code project</a>.
++    </div>
++    <p class="desc">
++      This page is a container page:<br>
++      <b><script>document.write(window.location.href);</script></b>
++    </p>
++    </center>
++  <div id="gadget-chrome-0" class="gadgets-gadget-chrome"></div>
++
++  <div id="output" style="clear: left;">
++  </div>
++
++  <!-- The counter panel -->
++  <style>
++    .payment-panel {
++      width:700px;
++      height:400px;
++      left:100px;
++      top:200px;
++      position:absolute;
++    }
++    .payment-panel iframe {
++      width:700px;
++      height:400px;
++    }
++  </style>
++  <!-- The payment processor panel, the processor page's domain should be the same as container domain -->
++  <div id="payment-processor" style="display:none;" class="payment-panel">
++    <iframe name="payment-processor-frame" frameborder=0 src="/container/payment-processor.html"></iframe>
++  </div>
++
++  <!-- The payment records processor panel, the processor page's domain should be the same as container domain -->
++  <div id="payment-records-processor" style="display:none;" class="payment-panel">
++    <iframe name="payment-processor-frame" frameborder=0 src="/container/payment-records-processor.html"></iframe>
++  </div>
++
++</body>
++</html>
++
+
+Property changes on: content\container\sample-payment-container.html
+___________________________________________________________________
+Added: svn:mime-type
+   + text/html
+Added: svn:eol-style
+   + native
+
+Index: content/container/sample-payment.xml
+===================================================================
+--- content/container/sample-payment.xml	(revision 0)
++++ content/container/sample-payment.xml	(revision 0)
+@@ -0,0 +1,164 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<Module>
++  <ModulePrefs title="My App Test"
++               author_email="yizi.wu@gmail.com" height="500">
++    <Require feature="opensocial-0.9"/>
++    <Require feature="dynamic-height"/>
++    <Require feature="settitle"/>
++    <Require feature="views"/>
++    <Require feature="rpc"/>
++  </ModulePrefs>
++  <Content type="html">
++    <![CDATA[
++      <style>
++        #main {font-size:13px;}
++        .t {width:300px; margin-left:3px;}
++        .f {border-collapse:collapse;margin-left:10px;}
++        .f tbody tr td {font-size:12px;font-weight:bold;white-space:nowrap;vertical-align:top;}
++        .f tbody tr td span {font-size:10px;white-space:normal;}
++        .desc {color:#007F7F;}
++      </style>
++      <script>
++        function requestPayment() {
++          var params = {};
++          params[opensocial.Payment.Field.AMOUNT] = document.getElementById('amount').value;
++          params[opensocial.Payment.Field.MESSAGE] = document.getElementById('message').value;
++          params[opensocial.Payment.Field.PARAMETERS] = gadgets.util.escapeString(document.getElementById('parameters').value);
++          params[opensocial.Payment.Field.PAYMENT_TYPE] = document.getElementById('creditType').checked ? 
++              opensocial.Payment.PaymentType.CREDIT : opensocial.Payment.PaymentType.PAYMENT;
++
++          var itemParams = {};
++          itemParams[opensocial.BillingItem.Field.SKU_ID] = 'test_sku1';
++          itemParams[opensocial.BillingItem.Field.PRICE] = 20;
++          itemParams[opensocial.BillingItem.Field.COUNT] = 2;
++          itemParams[opensocial.BillingItem.Field.DESCRIPTION] = 'demo description red flower';
++          var item1 = opensocial.newBillingItem(itemParams);
++
++          itemParams = {};
++          itemParams[opensocial.BillingItem.Field.SKU_ID] = 'test_sku2';
++          itemParams[opensocial.BillingItem.Field.PRICE] = 30;
++          itemParams[opensocial.BillingItem.Field.COUNT] = 4;
++          itemParams[opensocial.BillingItem.Field.DESCRIPTION] = 'demo description yellow flower';
++          var item2 = opensocial.newBillingItem(itemParams);
++
++
++          params[opensocial.Payment.Field.ITEMS] = [item1, item2];
++          var payment = opensocial.newPayment(params);
++
++          opensocial.requestPayment(payment, function(responseItem) {
++            document.getElementById('paymentOutput').style.display = 'block';
++            document.getElementById('status').innerHTML = responseItem.hadError() ? 'FAILED' : 'SUCCESS';
++            var data = responseItem.getData();
++            document.getElementById('type').innerHTML = data.getField(opensocial.Payment.Field.PAYMENT_TYPE);
++            document.getElementById('orderid').innerHTML = data.getField(opensocial.Payment.Field.ORDER_ID);
++            document.getElementById('code').innerHTML = data.getField(opensocial.Payment.Field.RESPONSE_CODE);
++            document.getElementById('resmsg').innerHTML = data.getField(opensocial.Payment.Field.RESPONSE_MESSAGE);
++            document.getElementById('orderedtime').innerHTML = new Date(data.getField(opensocial.Payment.Field.ORDERED_TIME)).toLocaleString();
++            document.getElementById('submittedtime').innerHTML = new Date(data.getField(opensocial.Payment.Field.SUBMITTED_TIME)).toLocaleString();
++            document.getElementById('executedtime').innerHTML = new Date(data.getField(opensocial.Payment.Field.EXECUTED_TIME)).toLocaleString();
++
++            gadgets.window.adjustHeight();
++          });
++          document.getElementById('paymentOutput').style.display = 'none';
++
++        };
++
++
++        function requestPaymentRecords() {
++
++          var params = {};
++          params[opensocial.Payment.RecordsRequestFields.MAX] = document.getElementById('max').value;
++          params[opensocial.Payment.RecordsRequestFields.SANDBOX] = document.getElementById('r_sandbox').checked;
++
++          opensocial.requestPaymentRecords(function(responseItem) {
++            document.getElementById('recordsOutput').style.display = 'block';
++            var data = responseItem.getData();
++
++            var html = 'Listing original incomplete payments before request.<br> Payments in bold are fixed manually by user afterward.<br>';
++            for (var i = 0; i < data.length; i++) {
++              var bold = data[i].getField(opensocial.Payment.Field.PAYMENT_COMPLETE);
++              if (bold) html += '<b>';
++              html += data[i].getField(opensocial.Payment.Field.ORDER_ID) + '&emsp;' + 
++                      data[i].getField(opensocial.Payment.Field.AMOUNT) + '&emsp;' + 
++                      data[i].getField(opensocial.Payment.Field.RESPONSE_MESSAGE) + '&emsp;' +
++                      new Date(data[i].getField(opensocial.Payment.Field.EXECUTED_TIME)).toLocaleString();
++              if (bold) html += '</b>';
++              html += '<br>';
++            }
++            document.getElementById('records').innerHTML = html;
++
++            gadgets.window.adjustHeight();
++          }, params);
++
++          document.getElementById('recordsOutput').style.display = 'none';
++        };
++
++        function init() {
++          var req = opensocial.newDataRequest();
++          req.add(req.newFetchPersonRequest(opensocial.IdSpec.PersonId.VIEWER), "req");
++          req.send(function(data) {
++            if (!data.hadError()) {
++              document.getElementById('myname').innerHTML = 'Current Viewer: <b>' + data.get("req").getData().getDisplayName() + '</b>';
++            }
++            gadgets.window.adjustHeight();
++          });
++        };
++        gadgets.util.registerOnLoadHandler(init);
++      </script>
++
++
++      <div id="main">
++        <p class="desc">
++            Here is the app domain inside the gadget iframe, usually different from container domain:<br>
++            <b><script>document.write('http://' + window.location.host + window.location.pathname + location.search.substring(0, 30) + '...');</script></b>
++        </p>
++        <p><span id="myname"></span></p><hr>
++
++        <div id=req>
++          <b>Make a Payment Request: </b><br>
++          <table class=f><tbody>
++          <tr><td>Amount: </td><td><input class=t id=amount value=100></td></tr>
++          <tr><td>Message: </td><td><input class=t id=message value="You are ordering some flowers."></td></tr>
++          <tr><td>Parameters: </td><td><input class=t id=parameters value="{type:'Tulip',quantity:5}"></td></tr>
++          <tr><td>Payment Type: </td><td>
++              <input type=radio id=paymentType name=pt checked><label for=paymentType>Payment</label>
++              <input type=radio id=creditType name=pt><label for=creditType>Credit</label>
++          </td></tr>
++          </tbody></table>
++          <button onclick="requestPayment();">Request Payment</button>
++        </div>
++
++        <div id=paymentOutput style="display:none">
++          <hr>
++          <b>Payment Response: </b><br>
++          <table class=f><tbody>
++          <tr><td>Payment Type: </td><td><span id=type></span></td></tr>
++          <tr><td>Status: </td><td><span id=status></span></td></tr>
++          <tr><td>Order ID: </td><td><span id=orderid></span></td></tr>
++          <tr><td>Response Code: </td><td><span id=code></span></td></tr>
++          <tr><td>Response Message: </td><td><span id=resmsg></span></td></tr>
++          <tr><td>Ordered Time: </td><td><span id=orderedtime></span></td></tr>
++          <tr><td>Submitted Time: </td><td><span id=submittedtime></span></td></tr>
++          <tr><td>Executed Time: </td><td><span id=executedtime></span></td></tr>
++          </tbody></table>
++        </div>
++        <hr>
++
++        <div>
++          <b>Make a Payment Records Request: </b><br>
++          <table class=f><tbody>
++          <tr><td><label for=sandbox>Sandbox: </label></td><td><input type=checkbox id=r_sandbox checked></td></tr>
++          <tr><td>Max: </td><td><input class=t id=max value=3></td></tr>
++          </tbody></table>
++          <button onclick="requestPaymentRecords();">Request Payment Records</button>
++        </div>
++        <div id=recordsOutput style="display:none">
++          <hr>
++          <div id=records></div>
++        </div>
++      </div>
++     ]]>
++  </Content>
++</Module>
++
++
+
+Property changes on: content\container\sample-payment.xml
+___________________________________________________________________
+Added: svn:mime-type
+   + text/xml
+Added: svn:eol-style
+   + native
+
+Index: features/src/main/javascript/features/features.txt
+===================================================================
+--- features/src/main/javascript/features/features.txt	(revision 950850)
++++ features/src/main/javascript/features/features.txt	(working copy)
+@@ -51,6 +51,7 @@
+ features/opensocial-data-context/feature.xml
+ features/opensocial-data/feature.xml
+ features/opensocial-jsonrpc/feature.xml
++features/opensocial-payment/feature.xml
+ features/opensocial-reference/feature.xml
+ features/opensocial-templates/feature.xml
+ features/osapi/feature.xml
+Index: features/src/main/javascript/features/opensocial-base/feature.xml
+===================================================================
+--- features/src/main/javascript/features/opensocial-base/feature.xml	(revision 950850)
++++ features/src/main/javascript/features/opensocial-base/feature.xml	(working copy)
+@@ -26,5 +26,6 @@
+     <script src="jsonperson.js"></script>    
+     <script src="jsonmessagecollection.js"></script>
+     <script src="jsonmessage.js"></script>
++    <script src="jsonpayment.js"></script>
+   </gadget>
+ </feature>
+Index: features/src/main/javascript/features/opensocial-base/jsonpayment.js
+===================================================================
+--- features/src/main/javascript/features/opensocial-base/jsonpayment.js	(revision 0)
++++ features/src/main/javascript/features/opensocial-base/jsonpayment.js	(revision 0)
+@@ -0,0 +1,81 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing,
++ * software distributed under the License is distributed on an
++ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++ * KIND, either express or implied.  See the License for the
++ * specific language governing permissions and limitations
++ * under the License.
++ */
++
++/*global opensocial */
++
++/**
++ * Base interface for json based payment objects.
++ * NOTE: This class is mainly copied from jsonactivity.js
++ *
++ * @private
++ * @constructor
++ */
++var JsonPayment = function(opt_params, opt_skipConversions) {
++  opt_params = opt_params || {};
++  if (!opt_skipConversions) {
++    JsonPayment.constructArrayObject(opt_params, 'items', JsonBillingItem);
++  }
++  opensocial.Payment.call(this, opt_params);
++};
++JsonPayment.inherits(opensocial.Payment);
++
++JsonPayment.prototype.toJsonObject = function() {
++  var jsonObject = JsonPayment.copyFields(this.fields_);
++
++  var oldBillingItems = jsonObject['items'] || [];
++  var newBillingItems = [];
++  for (var i = 0; i < oldBillingItems.length; i++) {
++    newBillingItems[i] = oldBillingItems[i].toJsonObject();
++  }
++  jsonObject['items'] = newBillingItems;
++
++  return jsonObject;
++};
++
++
++// TODO: Split into separate class
++var JsonBillingItem = function(opt_params) {
++  opensocial.BillingItem.call(this, opt_params);
++};
++JsonBillingItem.inherits(opensocial.BillingItem);
++
++JsonBillingItem.prototype.toJsonObject = function() {
++  return JsonPayment.copyFields(this.fields_);
++};
++
++
++// TODO: Pull this method into a common class, it is from jsonperson.js
++JsonPayment.constructArrayObject = function(map, fieldName, className) {
++  var fieldValue = map[fieldName];
++  if (fieldValue) {
++    for (var i = 0; i < fieldValue.length; i++) {
++      fieldValue[i] = new className(fieldValue[i]);
++    }
++  }
++};
++
++// TODO: Pull into common class as well
++JsonPayment.copyFields = function(oldObject) {
++  var newObject = {};
++  for (var field in oldObject) {
++    newObject[field] = oldObject[field];
++  }
++  return newObject;
++};
++
+
+Property changes on: features\src\main\javascript\features\opensocial-base\jsonpayment.js
+___________________________________________________________________
+Added: svn:mime-type
+   + text/javascript
+Added: svn:eol-style
+   + native
+
+Index: features/src/main/javascript/features/opensocial-jsonrpc/jsonrpccontainer.js
+===================================================================
+--- features/src/main/javascript/features/opensocial-jsonrpc/jsonrpccontainer.js	(revision 950850)
++++ features/src/main/javascript/features/opensocial-jsonrpc/jsonrpccontainer.js	(working copy)
+@@ -54,6 +54,14 @@
+ 
+   gadgets.rpc.register('shindig.requestShareApp_callback',
+       JsonRpcContainer.requestShareAppCallback_);
++
++  // For opensocial virtual currency extension.
++  gadgets.rpc.register('shindig.requestPayment_callback',
++      JsonRpcContainer.requestPaymentCallback_);
++  // For opensocial virtual currency extension.
++  gadgets.rpc.register('shindig.requestPaymentRecords_callback',
++      JsonRpcContainer.requestPaymentRecordsCallback_);
++
+ };
+ 
+ var JsonRpcRequestItem = function(rpc, opt_processData) {
+@@ -79,6 +87,115 @@
+     return this.environment_;
+   };
+ 
++  /**
++   * For OpenSocial VirtualCurrency Ext.
++   * The function invokes the whole process of a payment request. It calls the
++   * payment processor open function in parent container.
++   *
++   * @param {opensocial.Payment} payment The Payment object.
++   * @param {function(opensocial.ResponseItem)=} opt_callback The finishing
++   *     callback function.
++   * @private
++   */
++  JsonRpcContainer.prototype.requestPayment = function(payment, opt_callback) {
++    if (!payment) {
++      if (opt_callback) {
++        opt_callback(new opensocial.ResponseItem(null, payment, 
++          opensocial.Payment.ResponseCode.MALFORMED_REQUEST, 
++          'Payment object is undefined.'));
++      }
++      return;
++    }
++    
++    var callbackId = "cId_" + Math.random();
++    callbackIdStore[callbackId] = opt_callback;
++    // The rpc target is registered in container payment processor page.
++    gadgets.rpc.call('..', 'shindig.requestPayment',
++        null,
++        callbackId,
++        payment.toJsonObject());
++  };
++
++  /**
++   * For OpenSocial VirtualCurrency Ext. The callback function of receives the
++   * returned results from the parent container.
++   *
++   * @param {Object.<string, Object>} paymentJson A jsonpayment object with
++   *     parameters filled. 
++   * @private
++   */
++  JsonRpcContainer.requestPaymentCallback_ = function(callbackId, paymentJson) {
++    callback = callbackIdStore[callbackId];
++    if (callback) {
++      var errorCode = opensocial.Payment.ResponseCode[
++          paymentJson[opensocial.Payment.Field.RESPONSE_CODE]];
++      var message = paymentJson[opensocial.Payment.Field.RESPONSE_MESSAGE];
++
++      paymentJson[opensocial.Payment.Field.RESPONSE_CODE] = errorCode;
++      var payment = new JsonPayment(paymentJson, false);
++      var responseItem = new opensocial.ResponseItem(
++          null,
++          payment,
++          (errorCode == opensocial.Payment.ResponseCode.OK ? null : errorCode),
++          message);
++      callback(responseItem);
++    }
++  };
++
++  /**
++   * For OpenSocial VirtualCurrency Ext.
++   * The function invokes the payment records panel in parent container.
++   *
++   * @param {function(opensocial.ResponseItem)=} opt_callback The finishing
++   *     callback function.
++   * @param {Object.<pensocial.Payment.RecordsRequestFields, Object>=}
++   *     opt_params Additional parameters to pass to the request. 
++   * @private
++   */
++  JsonRpcContainer.prototype.requestPaymentRecords = function(opt_callback, 
++      opt_params) {
++    var callbackId = "cId_" + Math.random();
++    callbackIdStore[callbackId] = opt_callback;
++
++    // The rpc target is registered in container payment records page.  
++    gadgets.rpc.call('..', 'shindig.requestPaymentRecords',
++        null, callbackId, opt_params);
++  };
++
++  /**
++   * For OpenSocial VirtualCurrency Ext. The callback function of receives the
++   * returned results from the parent container.
++   *
++   * @param {Object.<string, Object>} opt_resultParams The fields set with
++   *     result parameters.
++   * @private
++   */
++  JsonRpcContainer.requestPaymentRecordsCallback_ = function(callbackId, 
++      recordsJson) {
++    callback = callbackIdStore[callbackId];
++    if (callback) {
++
++      var errorCode = opensocial.Payment.ResponseCode[
++          recordsJson[opensocial.Payment.Field.RESPONSE_CODE]];
++      var message = recordsJson[opensocial.Payment.Field.RESPONSE_MESSAGE];
++
++      var records = [];
++      var payments = recordsJson['payments'];
++      for (var orderId in payments) {
++        records.push(new JsonPayment(payments[orderId], false));
++      }
++      
++      var responseItem = new opensocial.ResponseItem(
++          null,
++          records, 
++          (errorCode == opensocial.Payment.ResponseCode.OK ? null : errorCode),
++          message);
++      callback(responseItem);
++    }
++  };
++
++  
++  
+   JsonRpcContainer.prototype.requestShareApp = function(recipientIds, reason,
+       opt_callback, opt_params) {
+     var callbackId = "cId_" + Math.random();
+@@ -440,6 +557,14 @@
+     return new JsonRpcRequestItem(rpc);
+   };
+ 
++  JsonRpcContainer.prototype.newPayment = function(opt_params) {
++    return new JsonPayment(opt_params, true);
++  };
++
++  JsonRpcContainer.prototype.newBillingItem = function(opt_params) {
++    return new JsonBillingItem(opt_params);
++  };
++
+   JsonRpcContainer.prototype.invalidateCache = function() {
+     var rpc = { method : "cache.invalidate" };
+     var invalidationKeys = { invalidationKeys : ["@viewer"] };
+Index: features/src/main/javascript/features/opensocial-payment/feature.xml
+===================================================================
+--- features/src/main/javascript/features/opensocial-payment/feature.xml	(revision 0)
++++ features/src/main/javascript/features/opensocial-payment/feature.xml	(revision 0)
+@@ -0,0 +1,27 @@
++<?xml version="1.0"?>
++<!--
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements. See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership. The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License. You may obtain a copy of the License at
++
++http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing,
++software distributed under the License is distributed on an
++"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++KIND, either express or implied. See the License for the
++specific language governing permissions and limitations under the License.
++-->
++<feature>
++  <name>opensocial-payment</name>
++  <dependency>core.io</dependency>
++  <dependency>rpc</dependency>
++  <container>
++    <script src="paymentprocessor.js"/>
++  </container>
++</feature>
++
+
+Property changes on: features\src\main\javascript\features\opensocial-payment\feature.xml
+___________________________________________________________________
+Added: svn:mime-type
+   + text/xml
+Added: svn:eol-style
+   + native
+
+Index: features/src/main/javascript/features/opensocial-payment/paymentprocessor.js
+===================================================================
+--- features/src/main/javascript/features/opensocial-payment/paymentprocessor.js	(revision 0)
++++ features/src/main/javascript/features/opensocial-payment/paymentprocessor.js	(revision 0)
+@@ -0,0 +1,403 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements. See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership. The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * 'License'); you may not use this file except in compliance
++ * with the License. You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing,
++ * software distributed under the License is distributed on an
++ * 'AS IS' BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++ * KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations under the License.
++ */
++
++/**
++ * @fileoverview Container-side codes as a processor logic for the virtual 
++ * currency payment functionality.
++ */
++
++var shindig = shindig || {};
++
++
++/**
++ * @static
++ * @class Provides the virtual currency payment processor features on 
++          container side. Handles the payment request from app, prompts the 
++          container processor page for user to confirm the payment, and 
++          passes the response back to the app. The container need to implement 
++          the open/close event functions to fulfill the functionality.
++ * @name shindig.paymentprocessor
++ */
++shindig.paymentprocessor = (function() {
++  /**
++   * The state indicating if the processor panel is on or off.
++   * @type {boolean}
++   */
++  var isOpened_ = false;
++
++  /**
++   * A set of params for the procedure that holds necessary data needed for container 
++   * processor panel page. In the implementation of the processor panel page, you can use 
++   * <code>getParam</code> function and <code>setParam</code> to access the values in this set. Here
++   * <paymentJson> is the pure json format of an opensocial.Payment object defined on gadget side.
++   * E.g.  getParam('payment.orderId') returns the orderId field in paymentJson.
++   *
++   * Here lists the preset data of params set:
++   * 
++   * {
++   *   frameId : <string>,
++   *   appTitle : <string>,
++   *   appSpec : <string>,
++   *   stoken : <string>,
++   *   callbackId : <string>,
++   *   
++   *   payment : <paymentJson>,      // Only for requestPayment process
++   *
++   *   records : {                   // Only for requestPaymentRecords process
++   *     responseCode : <string>,
++   *     responseMessage : <string>,
++   *     payments : {
++   *       <orderId> : <paymentJson>,
++   *       <orderId> : <paymentJson>,
++   *       ...
++   *     }
++   *   },
++   *   reqParams : <object>          // Only for requestPaymentRecords process
++   * }
++   *
++   * @type {Object.<string, Object>}
++   */
++  var processorParams_ = null;
++
++  /**
++   * A set of event functions which allow customizing the UI and actions of the
++   * processor panel by container. They are passed in and registered in the
++   * init functions.
++   * @type {Object.<string, function()>}
++   */
++  var events_ = {};
++
++  /**
++   * Initiates the gadget parameters for the current processor. It uses a frameId
++   * which indicates which gadget is requesting payment. 
++   *
++   * NOTE: The 'shindig-container' feature is required.
++   * @see /features/shindig-container/
++   *
++   * @return {Object.<string, string>} The gadget meta data.
++   */
++  function initGadgetParams(frameId) {
++    var params = null;
++    if (shindig.container && shindig.container.gadgetService) {
++      params = {};
++      params['frameId'] = frameId;
++
++      // By default, will set the title and spec with default value.
++      params['appTitle'] = 'Unknown Title';
++      params['appSpec'] = 'Unknown SpecUrl';
++      // This part need the shindig.container service support or customized by 
++      // container page.
++      var thisGadget = shindig.container.getGadget(
++          shindig.container.gadgetService.getGadgetIdFromModuleId(frameId));
++      if (thisGadget) {
++        params['appTitle'] = thisGadget['title'];
++        params['appSpec'] = thisGadget['specUrl'];
++        params['stoken'] = thisGadget['securityToken'];
++      }
++    }
++    return params;
++  };
++
++
++  /**
++   * Handles the request called via rpc from opensocial.requestPayment on the
++   * app side. Turns on the processor panel.
++   * <p>
++   * The 'this' in this function is the rpc object, thus contains
++   * some information of the app.
++   * </p>
++   * <p>
++   * See the definition of processorParams_ for the structure of the underlying
++   * object.
++   * </p>
++   *
++   * @param {Object.<string, Object>} paymentJson The json object holding the
++   *     payment parameters from the app with ITEMS, AMOUNT, MESSAGE and
++   *     PARAMETERS fields set. Note that this object is serialized and passed
++   *     through RPC channel so all functions are lost.
++   */
++  function openPayment_(callbackId, paymentJson) {
++    // Checks if the processor panel should be opened.
++    if (isOpened_) {
++      // Shouldn't continue if the processor is already opened.
++      paymentJson['responseCode'] = 'PAYMENT_PROCESSOR_ALREADY_OPENED';
++    }
++
++    if (!paymentJson['amount'] || paymentJson['amount'] <= 0) {
++      // TODO: Need more check on the AMOUNT value and other values.
++      paymentJson['responseCode'] = 'MALFORMED_REQUEST';
++    }
++
++    if (!events_['paymentOpen']) {
++      // If the open event handle is not registered, return not-implemented.
++      paymentJson['responseCode'] = 'NOT_IMPLEMENTED';
++    }
++
++    // Initialize the processor parameters.
++    processorParams_ = initGadgetParams(this.f);
++    if (processorParams_ == null) {
++      paymentJson['responseCode'] = 'NOT_IMPLEMENTED';
++    }
++    
++    if (paymentJson['responseCode'] && paymentJson['responseCode'] != 'OK') {
++      // callback immediately if any errorcode exists here.
++      try {
++        gadgets.rpc.call(this.f, 'shindig.requestPayment_callback', null,
++                         callbackId, paymentJson);
++      } finally {
++        return;
++      }
++    }
++
++    isOpened_ = true;
++
++    // Fill the payment fields before the payment process.
++    paymentJson['orderedTime'] = new Date().getTime();
++    paymentJson['message'] = gadgets.util.escapeString(paymentJson['message']);
++
++    processorParams_['callbackId'] = callbackId;
++    processorParams_['payment'] = paymentJson;
++
++    // Call the container's open event to display the processor panel UI.
++    events_.paymentOpen();
++  };
++
++
++  /**
++   * Invoked by button click event in processor panel on container side to 
++   * close the processor panel. Will calls the rpc callback in app.
++   */
++  function closePayment_() {
++    if (!isOpened_) {
++      return;
++    }
++
++    // Call the container's close event to hide the processor panel.
++    // The close event is optional. If not set, do nothing.
++    // (NOTE that the panel is still visible if do nothing...)
++    if (events_.paymentClose) {
++      events_.paymentClose();
++    }
++
++    // Return to the app via rpc.
++    try {
++      gadgets.rpc.call(processorParams_['frameId'], 
++                       'shindig.requestPayment_callback',
++                       null,
++                       processorParams_['callbackId'],
++                       processorParams_['payment']);
++    } catch(e) {
++      // TODO
++    } finally {
++      // Reset the underlying data.
++      isOpened_ = false;
++      processorParams_ = null;
++    }
++  };
++
++
++  /**
++   * Handles the request called via rpc from opensocial.requestPaymentRecords
++   * on the app side. Turns on the processor panel.
++   * <p>
++   * The 'this' in this function is the rpc object, thus contains
++   * some information of the app.
++   * </p>
++   * <p>
++   * See the definition of processorParams_ for the structure of the underlying object.
++   * </p>
++   *
++   * @param {Object.<opensocial.Payment.RecordsRequestFields, Object>} reqParams
++   *     Additional parameters to pass to the request. 
++   */
++  function openPaymentRecords_(callbackId, reqParams) {
++    // This object is for response.
++    var paymentRecordsJson = {'payments' : {}};
++
++    // Checks if the processor panel should be opened.
++    if (isOpened_) {
++      // Shouldn't continue if the processor is already opened.
++      paymentRecordsJson['responseCode'] = 'PAYMENT_PROCESSOR_ALREADY_OPENED';
++    }
++
++    if (!events_['paymentRecordsOpen']) {
++      // If the open event handler is not registered, return not-implemented.
++      paymentRecordsJson['responseCode'] = 'NOT_IMPLEMENTED';
++    }
++
++    if (paymentRecordsJson['responseCode'] && 
++        paymentRecordsJson['responseCode'] != 'OK') {
++      // callback immediately if any errorcode exists here.
++      try {
++        gadgets.rpc.call(this.f, 'shindig.requestPaymentRecords_callback', null,
++                         callbackId, paymentRecordsJson);
++      } finally {
++        return;
++      }
++    }
++
++    isOpened_ = true;
++
++    // Initialize the processor parameters.
++    processorParams_ = initGadgetParams(this.f);
++    processorParams_['callbackId'] = callbackId;
++    processorParams_['records'] = paymentRecordsJson;
++    
++    processorParams_['reqParams'] = reqParams;
++
++    // Call the container's open event to display the processor panel UI.
++    events_['paymentRecordsOpen']();
++  };
++
++
++  /**
++   * Invoked by button click event in processor panel on container side to 
++   * close the processor panel. Will calls the rpc callback in app.
++   */
++  function closePaymentRecords_() {
++    if (!isOpened_) {
++      return;
++    }
++
++    // Call the container's cancel event to do some UI change if needed.
++    if (events_['paymentRecordsClose']) {
++      events_['paymentRecordsClose']();
++    }
++
++    try {
++      // Return to the app via rpc.
++      gadgets.rpc.call(processorParams_['frameId'], 
++                     'shindig.requestPaymentRecords_callback',
++                     null,
++                     processorParams_['callbackId'],
++                     processorParams_['records']);
++    } finally {
++      // Reset the underlying data.
++      isOpened_ = false;
++      processorParams_ = null;
++    }
++
++  };
++
++  /**
++   * Accessor to get the parameter value by a key. The key can be chained
++   * using dot symbol. E.g.  getParam('foo.bar') will return 
++   * processParams_.foo.bar .
++   *
++   * @param {string} key The access key.
++   * @return {Object} The value stored in processParams_ on the given key. 
++   */
++  function getParam_(key) {
++    if (!key) return null;
++    var value = null;
++    try {
++      var arr = key.split('.');
++      if (arr.length > 0) {
++        var prop = processorParams_;
++        for (var i = 0; i < arr.length; i++) {
++          prop = prop[arr[i]];
++        }
++        value = prop;
++      }
++    } catch(e) {
++      value = null;
++    }
++    return value;
++  };
++
++  /**
++   * Accessor to set the parameter value by a key. The key can be chained
++   * using dot symbol. E.g. setParam('foo.bar', value) will set the value on
++   * processParams_.foo.bar .
++   *
++   * @param {string} key The access key.
++   * @param {Object} value The value to be set.
++   */
++  function setParam_(key, value) {
++    if (!key) return;
++    try {
++      var arr = key.split('.');
++      if (arr.length > 1) {
++        var prop = processorParams_;
++        for (var i = 0; i < arr.length - 1; i++) {
++          prop = prop[arr[i]];
++        }
++        prop[arr[arr.length - 1]] = value;
++      }
++    } finally {
++      return;
++    }
++  };
++
++  return /** @scope shindig.paymentprocessor */ {
++    /**
++     * Initializes the 'requestPayment' rpc. It's called by container page in 
++     * onload function.
++     */
++    initPayment : function(openEvent, closeEvent) {
++      events_.paymentOpen = openEvent;
++      events_.paymentClose = closeEvent;
++      gadgets.rpc.register('shindig.requestPayment', openPayment_);
++    },
++
++    /**
++     * Initializes the 'requestPaymentRecords' rpc. It's called by container 
++     * processor page in onload function.
++     */
++    initPaymentRecords : function(openEvent, closeEvent) {
++      events_.paymentRecordsOpen = openEvent;
++      events_.paymentRecordsClose = closeEvent;
++      gadgets.rpc.register('shindig.requestPaymentRecords',
++                           openPaymentRecords_);
++    },
++
++    /**
++     * The open function for 'requestPayment' pannel. Invoked by rpc from app.
++     */
++    openPayment : openPayment_,
++
++    /**
++     * The close function for 'requestPayment' pannel. Invoked by button click
++     * event in processor panel on container side. 
++     */
++    closePayment : closePayment_,
++
++    /**
++     * The open function for 'requestPaymentRecords' pannel. Invoked by rpc 
++     * from app.
++     */
++    openPaymentRecords : openPaymentRecords_,
++
++    /**
++     * The close function for 'requestPaymentRecords' pannel. Invoked by button 
++     * click event in processor panel on container side. 
++     */
++    closePaymentRecords : closePaymentRecords_,
++
++    /**
++     * Exposes the processor parameters to processor panel.
++     */
++    getParam : getParam_,
++
++    /**
++     * Updates the processor parameters from processor panel.
++     */
++    setParam : setParam_
++  };
++
++})();
+
+Property changes on: features\src\main\javascript\features\opensocial-payment\paymentprocessor.js
+___________________________________________________________________
+Added: svn:mime-type
+   + text/javascript
+Added: svn:eol-style
+   + native
+
+Index: features/src/main/javascript/features/opensocial-reference/billingitem.js
+===================================================================
+--- features/src/main/javascript/features/opensocial-reference/billingitem.js	(revision 0)
++++ features/src/main/javascript/features/opensocial-reference/billingitem.js	(revision 0)
+@@ -0,0 +1,109 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing,
++ * software distributed under the License is distributed on an
++ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++ * KIND, either express or implied.  See the License for the
++ * specific language governing permissions and limitations
++ * under the License.
++ */
++
++/**
++ * @class
++ * Representation of a billing item.
++ ?
++ * @name opensocial.BillingItem
++ */
++
++
++/**
++ * Base interface for billing item objects.
++ *
++ * @param {Map.&lt;opensocial.BillingItem.Field, Object&gt;} params
++ *    Parameters defining the billing item.
++ * @private
++ * @constructor
++ */
++opensocial.BillingItem = function(params) {
++  this.fields_ = params || {};
++  this.fields_[opensocial.BillingItem.Field.COUNT] = 
++      this.fields_[opensocial.BillingItem.Field.COUNT] || 1;
++};
++
++/**
++ * @static
++ * @class
++ * All of the fields that a billing item object can have.
++ *
++ * <p>The SKU_ID and PRINE are required for the request. </p>
++ *
++ * <p>
++ * <b>See also:</b>
++ * <a href="opensocial.BillingItem.html#getField">
++ *    opensocial.BillingItem.getField()</a>
++ * </p>
++ *
++ * @name opensocial.Payment.Field
++ */
++opensocial.BillingItem.Field = {
++  /**
++   * @member opensocial.BillingItem.Field
++   */
++  SKU_ID : 'skuId',
++
++  /**
++   * @member opensocial.BillingItem.Field
++   */
++  PRICE : 'price',
++
++  /**
++   * @member opensocial.BillingItem.Field
++   */
++  COUNT : 'count',
++
++  /**
++   * @member opensocial.BillingItem.Field
++   */
++  DESCRIPTION : 'description'
++
++};
++
++
++/**
++ * Gets the billing item field data that's associated with the specified key.
++ *
++ * @param {String} key The key to get data for;
++ *   see the <a href="opensocial.BillingItem.Field.html">Field</a> class
++ * for possible values
++ * @param {Map.&lt;opensocial.DataRequest.DataRequestFields, Object&gt;}
++ *  opt_params Additional
++ *    <a href="opensocial.DataRequest.DataRequestFields.html">params</a>
++ *    to pass to the request.
++ * @return {String} The data
++ * @member opensocial.BillingItem
++ */
++opensocial.BillingItem.prototype.getField = function(key, opt_params) {
++  return opensocial.Container.getField(this.fields_, key, opt_params);
++};
++
++
++/**
++ * Sets data for this billing item associated with the given key.
++ *
++ * @param {String} key The key to set data for
++ * @param {String} data The data to set
++ */
++opensocial.BillingItem.prototype.setField = function(key, data) {
++  return this.fields_[key] = data;
++};
++
++
+
+Property changes on: features\src\main\javascript\features\opensocial-reference\billingitem.js
+___________________________________________________________________
+Added: svn:mime-type
+   + text/javascript
+Added: svn:eol-style
+   + native
+
+Index: features/src/main/javascript/features/opensocial-reference/container.js
+===================================================================
+--- features/src/main/javascript/features/opensocial-reference/container.js	(revision 950850)
++++ features/src/main/javascript/features/opensocial-reference/container.js	(working copy)
+@@ -204,6 +204,51 @@
+ 
+ 
+ /**
++ * Requests the container to open a payment processor panel to show and submit
++ * user's order. If the container does not support this method the callback 
++ * will be called with a opensocial.ResponseItem. The response item will have 
++ * its error code set to NOT_IMPLEMENTED.
++ *
++ * @param {opensocial.Payment} payment The Payment object.
++ * @param {function(opensocial.ResponseItem)=} opt_callback The finishing
++ *     callback function.
++ */
++opensocial.Container.prototype.requestPayment = function(payment,
++    opt_callback) {
++  if (opt_callback) {
++    window.setTimeout(function() {
++      opt_callback(new opensocial.ResponseItem(
++          null, payment, opensocial.Payment.ResponseCode.NOT_IMPLEMENTED, 
++          null));
++    }, 0);
++  }
++};
++
++/**
++ * Requests the container to open a payment records processor panel to list all
++ * completed or incomplete payments of the user on current app and allowing 
++ * users to fix the incomplete payments. If the container does not support 
++ * this method the callback will be called with a opensocial.ResponseItem. 
++ * The response item will have its error code set to NOT_IMPLEMENTED.
++ *
++ * @param {function(opensocial.ResponseItem)=} opt_callback The finishing
++ *     callback function.
++ * @param {Object.<opensocial.Payment.RecordsRequestFields, Object>=}
++ *     opt_params Additional parameters to pass to the request. 
++ */
++opensocial.Container.prototype.requestPaymentRecords = function(opt_callback, 
++    opt_params) {
++  if (opt_callback) {
++    window.setTimeout(function() {
++      opt_callback(new opensocial.ResponseItem(
++          null, payment, opensocial.Payment.ResponseCode.NOT_IMPLEMENTED, 
++          null));
++    }, 0);
++  }
++};
++
++
++/**
+  * Calls the callback function with a dataResponse object containing the data
+  * asked for in the dataRequest object.
+  *
+@@ -501,6 +546,32 @@
+ 
+ 
+ /**
++ * Creates a payment object.
++ * @param {Map.&lt;opensocial.Payment.Field, Object&gt;} params
++ *     Parameters defining the payment object.
++ * @return {opensocial.Payment} The new
++ *     <a href="opensocial.Payment.html">Payment</a> object
++ * @private
++ */
++opensocial.Container.prototype.newPayment = function(params) {
++  return new opensocial.Payment(params);
++};
++
++
++/**
++ * Creates a billing item object.
++ * @param {Map.&lt;opensocial.BillingItem.Field, Object&gt;} params
++ *     Parameters defining the billing item object.
++ * @return {opensocial.BillingItem} The new
++ *     <a href="opensocial.BillingItem.html">BillingItem</a> object
++ * @private
++ */
++opensocial.Container.prototype.newBillingItem = function(params) {
++  return new opensocial.BillingItem(params);
++};
++
++
++/**
+  * Creates a new response item with caja support if enabled.
+  * @return {opensocial.ResponseItem} the response item object
+  * @private
+@@ -523,6 +594,7 @@
+ };
+ 
+ 
++
+ /**
+  * Get a data request object to use for sending and fetching data from the
+  * server.
+Index: features/src/main/javascript/features/opensocial-reference/feature.xml
+===================================================================
+--- features/src/main/javascript/features/opensocial-reference/feature.xml	(revision 950850)
++++ features/src/main/javascript/features/opensocial-reference/feature.xml	(working copy)
+@@ -24,6 +24,7 @@
+     <script src="opensocial.js"/>
+     <script src="activity.js"/>
+     <script src="address.js"/>
++    <script src="billingitem.js"/>
+     <script src="album.js"/>
+     <script src="bodytype.js"/>
+     <script src="collection.js"/>
+@@ -40,6 +41,7 @@
+     <script src="name.js"/>
+     <script src="navigationparameters.js"/>
+     <script src="organization.js"/>
++    <script src="payment.js"/>
+     <script src="person.js"/>
+     <script src="phone.js"/>
+     <script src="responseitem.js"/>
+Index: features/src/main/javascript/features/opensocial-reference/opensocial.js
+===================================================================
+--- features/src/main/javascript/features/opensocial-reference/opensocial.js	(revision 950850)
++++ features/src/main/javascript/features/opensocial-reference/opensocial.js	(working copy)
+@@ -288,6 +288,38 @@
+ 
+ 
+ /**
++ * Requests the container to open a payment processor panel to show and submit
++ * user's order. If the container does not support this method the callback 
++ * will be called with a opensocial.ResponseItem. The response item will have 
++ * its error code set to NOT_IMPLEMENTED.
++ *
++ * @param {opensocial.Payment} payment The Payment object.
++ * @param {function(opensocial.ResponseItem)=} opt_callback The finishing
++ *     callback function.
++ */
++opensocial.requestPayment = function(payment, opt_callback) {
++  opensocial.Container.get().requestPayment(payment, opt_callback);
++};
++
++
++/**
++ * Requests the container to open a payment records processor panel to list all
++ * completed or incomplete payments of the user on current app and allowing 
++ * users to fix the incomplete payments. If the container does not support 
++ * this method the callback will be called with a opensocial.ResponseItem.
++ * The response item will have its error code set to NOT_IMPLEMENTED.
++ *
++ * @param {function(opensocial.ResponseItem)=} opt_callback The finishing
++ *     callback function.
++ * @param {Object.<opensocial.Payment.RecordsRequestFields, Object>=}
++ *     opt_params Additional parameters to pass to the request.
++ */
++opensocial.requestPaymentRecords = function(opt_callback, opt_params) {
++  opensocial.Container.get().requestPaymentRecords(opt_callback, opt_params);
++};
++
++
++/**
+  * Gets the current environment for this gadget. You can use the environment to
+  * make queries such as what profile fields and surfaces are supported by this
+  * container, what parameters were passed to the current gadget, and so on.
+@@ -469,6 +501,34 @@
+ 
+ 
+ /**
++ * Creates a payment object.
++ *
++ * @param {Object.<opensocial.Payment.Field, Object>} params
++ *    Parameters defining the payment object.
++ * @return {opensocial.Payment} The new
++ *     <a href="opensocial.Payment.html">Payment</a> object
++ * @member opensocial
++ */
++opensocial.newPayment = function(params) {
++  return opensocial.Container.get().newPayment(params);
++};
++
++
++/**
++ * Creates a billing item object.
++ *
++ * @param {Object.<opensocial.BillingItem.Field, Object>} params
++ *    Parameters defining the billing item object.
++ * @return {opensocial.BillingItem} The new
++ *     <a href="opensocial.BillingItem.html">BillingItem</a> object
++ * @member opensocial
++ */
++opensocial.newBillingItem = function(params) {
++  return opensocial.Container.get().newBillingItem(params);
++};
++
++
++/**
+  * Invalidates all resources cached for the current viewer.
+  */
+ opensocial.invalidateCache = function() {
+Index: features/src/main/javascript/features/opensocial-reference/payment.js
+===================================================================
+--- features/src/main/javascript/features/opensocial-reference/payment.js	(revision 0)
++++ features/src/main/javascript/features/opensocial-reference/payment.js	(revision 0)
+@@ -0,0 +1,287 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing,
++ * software distributed under the License is distributed on an
++ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++ * KIND, either express or implied.  See the License for the
++ * specific language governing permissions and limitations
++ * under the License.
++ */
++
++/**
++ * @class
++ * Representation of a payment.
++ ?
++ * @name opensocial.Payment
++ */
++
++
++/**
++ * Base interface for all payment objects.
++ *
++ * @param {Object.<opensocial.Payment.Field, Object>} params
++ *    Parameters defining the payment.
++ * @private
++ * @constructor
++ */
++opensocial.Payment = function(params) {
++  this.fields_ = params || {};
++  this.fields_[opensocial.Payment.Field.PAYMENT_TYPE] = 
++      this.fields_[opensocial.Payment.Field.PAYMENT_TYPE] || 
++      opensocial.Payment.PaymentType.PAYMENT;
++};
++
++
++opensocial.Payment.prototype.isPayment = function() {
++  return this.fields_[opensocial.Payment.Field.PAYMENT_TYPE] == 
++      opensocial.Payment.PaymentType.PAYMENT;
++};
++
++opensocial.Payment.prototype.isCredit = function() {
++  return this.fields_[opensocial.Payment.Field.PAYMENT_TYPE] == 
++      opensocial.Payment.PaymentType.CREDIT;
++};
++
++opensocial.Payment.prototype.isComplete = function() {
++  return !!this.fields_[opensocial.Payment.Field.PAYMENT_COMPLETE];
++};
++
++
++/**
++ * @static
++ * @class
++ * All of the fields that a payment object can have.
++ *
++ * <p>The ITEMS, AMOUNT, MESSAGE, PARAMETERS are required for the request. </p>
++ *
++ * <p>And the ORDER_ID, ORDERED_TIME, SUBMITTED_TIME, EXECUTED_TIME fields 
++ * will be filled during the procedure and return to the app. </p>
++ * <p>
++ * <b>See also:</b>
++ * <a
++ * href="opensocial.Payment.html#getField">opensocial.Payment.getField()</a>
++ * </p>
++ *
++ * @name opensocial.Payment.Field
++ */
++opensocial.Payment.Field = {
++  /**
++   * @member opensocial.Payment.Field
++   */
++  SANDBOX : 'sandbox',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  ITEMS : 'items',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  AMOUNT : 'amount',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  MESSAGE : 'message',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  PARAMETERS : 'parameters',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  PAYMENT_TYPE : 'paymentType',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  ORDER_ID : 'orderId',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  ORDERED_TIME : 'orderedTime',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  SUBMITTED_TIME : 'submittedTime',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  EXECUTED_TIME : 'executedTime',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  RESPONSE_CODE : 'responseCode',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  RESPONSE_MESSAGE : 'responseMessage',
++
++  /**
++   * @member opensocial.Payment.Field
++   */
++  PAYMENT_COMPLETE : 'paymentComplete'
++
++};
++
++
++/**
++ * Gets the payment field data that's associated with the specified key.
++ *
++ * @param {string} key The key to get data for;
++ *   see the <a href="opensocial.Payment.Field.html">Field</a> class
++ * for possible values
++ * @param {Object.<opensocial.DataRequest.DataRequestFields, Object>=}
++ *  opt_params Additional
++ *    <a href="opensocial.DataRequest.DataRequestFields.html">params</a>
++ *    to pass to the request.
++ * @return {string} The data
++ * @member opensocial.Payment
++ */
++opensocial.Payment.prototype.getField = function(key, opt_params) {
++  return opensocial.Container.getField(this.fields_, key, opt_params);
++};
++
++
++/**
++ * Sets data for this payment associated with the given key.
++ *
++ * @param {string} key The key to set data for
++ * @param {string} data The data to set
++ */
++opensocial.Payment.prototype.setField = function(key, data) {
++  return this.fields_[key] = data;
++};
++
++
++/**
++ * @static
++ * @class
++ * Types for a payment.
++ *
++ * @name opensocial.Payment.PaymentType
++ */
++opensocial.Payment.PaymentType = {
++  /**
++   * @member opensocial.Payment.PaymentType
++   */
++  PAYMENT : 'payment',
++
++  /**
++   * @member opensocial.Payment.PaymentType
++   */
++  CREDIT : 'credit'
++};
++
++
++/**
++ * @static
++ * @class
++ * Possible response codes for the whole payment process.
++ *
++ * @name opensocial.Payment.ResponseCode
++ */
++opensocial.Payment.ResponseCode = {
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  APP_LOGIC_ERROR : 'appLogicError',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  APP_NETWORK_FAILURE : 'appNetworkFailure',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  INSUFFICIENT_MONEY : 'insufficientMoney',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  INVALID_TOKEN : 'invalidToken',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  MALFORMED_REQUEST : 'malformedRequest',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  NOT_IMPLEMENTED : 'notImplemented',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  OK : 'ok',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  PAYMENT_ERROR : 'paymentError',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  PAYMENT_PROCESSOR_ALREADY_OPENED : 'paymentProcessorAlreadyOpened',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  UNKNOWN_ERROR : 'unknownError',
++
++  /**
++   * @member opensocial.Payment.ResponseCode
++   */
++  USER_CANCELLED : 'userCancelled'
++};
++
++
++/**
++ * @static
++ * @class
++ * Request fields for requesting payment records.
++ *
++ * @name opensocial.Payment.RecordsRequestFields
++ */
++opensocial.Payment.RecordsRequestFields = {
++
++  /**
++   * @member opensocial.Payment.RecordsRequestFields
++   */
++  SANDBOX : 'sandbox',
++
++  /**
++   * @member opensocial.Payment.RecordsRequestFields
++   */
++  MAX : 'max',
++
++  /**
++   * @member opensocial.Payment.RecordsRequestFields
++   */
++  INCOMPLETE_ONLY : 'incompleteOnly'
++
++};
++
++
++
++
+
+Property changes on: features\src\main\javascript\features\opensocial-reference\payment.js
+___________________________________________________________________
+Added: svn:mime-type
+   + text/javascript
+Added: svn:eol-style
+   + native
+
